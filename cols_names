@@ -1,0 +1,17 @@
+Fecha-I:Fecha y hora programada del vuelo
+Vlo-I:Número de vuelo programado (Correlativo respecto a que ?)
+Ori-I:Código de ciudad de origen programado
+Des-I: Código de ciudad de destino programado
+Emp-I:Código aerolínea de vuelo programado
+Fecha-O:Fecha y hora de operación del vuelo
+Vlo-O:Número de vuelo de operación del vuelo (Diferencia respecto a Vlo-1 )
+Ori-O:Código de ciudad de origen de operaciónDes-O:Código de ciudad de destino de operación
+Emp-O:Código aerolínea de vuelo operado
+DIA:Día del mes de operación del vuelo
+MES: Número de mes de operación del vuelo
+AÑO:Año de operación del vuelo
+DIANOM:Día de la semana de operación del vuelo
+TIPOVUELO:Tipo de vuelo,I=Internacional,N=Nacional
+OPERA:Nombre de aerolínea que opera
+SIGLAORI:Nombre ciudad origen
+SIGLADES:Nombre ciudad destino

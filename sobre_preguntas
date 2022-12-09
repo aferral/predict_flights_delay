@@ -1,0 +1,25 @@
+1. ¿Cómo se distribuyen los datos? ¿Qué te llama la atención o cuál es tu conclusión sobre esto?
+
+
+2. Genera las columnas adicionales y luego expórtelas en un archivosynthetic_features.csv
+
+periodo_dia: mañana(entre 5:00 y 11:59) ,tarde( entre 12:00 y 18:59)  y noche( entre 19:00 y 4:59), en base a Fecha-I
+
+
+3. ¿Cómo se compone la tasa de atraso por:
+    destino,
+    aerolínea,
+    mes del año,
+    día de la semana,
+    temporada,
+    tipo de vuelo?
+    ¿Qué variables esperarías que más influyeran en predecir atrasos?
+
+
+4. Entrena uno o varios modelos (usando el/los algoritmo(s) que prefieras) para estimar la probabilidad de atraso de un vuelo.
+Siéntete libre de generar variables adicionales y/o complementar con variables externas.
+
+5. Evalúa tu modelo.¿Qué performance tiene?¿Qué métricas usaste para evaluar esa performance y porqué?
+¿Porqué elegiste ese algoritmo en particular?
+¿Qué variables son las que más influyen en la predicción?
+¿Cómo podrías mejorar la performance?
