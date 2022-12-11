@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, roc_auc_score, precision_recall_curve, PrecisionRecallDisplay, \
-    roc_curve
+    roc_curve,f1_score
 import numpy as np
 
 
-def evaluate_predicted_df(df, name):
+def evaluate_predicted_df(df, name,plot=False):
     y_true = df['atraso_15'].astype(int).values
     y_pred = df['y_pred'].astype(int).values
     y_score = df['y_score'].values
@@ -12,24 +12,26 @@ def evaluate_predicted_df(df, name):
     print("=========== model: {0} ==============".format(name))
     print(classification_report(y_true=y_true, y_pred=y_pred, target_names=['oka', 'atraso']))
     roc_area = roc_auc_score(y_true=y_true, y_score=y_score)
+    f1_val = f1_score(y_true=y_true, y_pred=y_pred,pos_label=0) * 0.5 + f1_score(y_true=y_true, y_pred=y_pred,pos_label=1)*0.5
     print("ROC area {0}".format(roc_area))
 
-    precision, recall, thresholds = precision_recall_curve(y_true, y_score)
+    if plot:
+        precision, recall, thresholds = precision_recall_curve(y_true, y_score)
+        disp = PrecisionRecallDisplay(precision=precision, recall=recall)
+        disp.plot()
+        plt.show()
 
-    disp = PrecisionRecallDisplay(precision=precision, recall=recall)
-    disp.plot()
-    plt.show()
+        plot_roc(y_true, y_score)
 
-    plot_roc(y_true, y_score)
-
-    fig, ax = plt.subplots()
-    ax.plot(recall, precision, color='purple')
-    ax.set_title('Precision-Recall Curve')
-    ax.set_ylabel('Precision')
-    ax.set_xlabel('Recall')
-    # display plot
-    plt.show()
-    print('=========================================')
+        fig, ax = plt.subplots()
+        ax.plot(recall, precision, color='purple')
+        ax.set_title('Precision-Recall Curve')
+        ax.set_ylabel('Precision')
+        ax.set_xlabel('Recall')
+        # display plot
+        plt.show()
+        print('=========================================')
+    return roc_area,f1_val
 
 
 def get_metric_and_best_threshold_from_roc_curve(y_train, y_score, calc='f1'):
@@ -52,6 +54,14 @@ def get_metric_and_best_threshold_from_roc_curve(y_train, y_score, calc='f1'):
         F1_neg = np.nan_to_num(2 * (precision_neg * recall_neg) / (precision_neg + recall_neg + 0.00000001), 0)
 
         score = F1_pos * 0.5 + F1_neg * 0.5
+        best_threshold = thresholds[np.argmax(score)]
+        best_score = np.amax(score)
+
+    elif calc == 'f1_pos':
+        precision_pos = (tp) * 1.0 / (tp + fp)
+        recall_pos = tpr
+        F1_pos = np.nan_to_num(2 * (precision_pos * recall_pos) / (precision_pos + recall_pos + 0.00000001), 0)
+        score = F1_pos
         best_threshold = thresholds[np.argmax(score)]
         best_score = np.amax(score)
 

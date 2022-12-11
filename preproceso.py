@@ -1,6 +1,19 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import OneHotEncoder
+
+dict_dia_semana = {
+    'Lunes': 0,
+    'Martes': 1,
+    'Miercoles': 2,
+    'Jueves': 3,
+    'Viernes': 4,
+    'Sabado': 5,
+    'Domingo': 6,
+}
+
+RELEVANT_COUNTRIES=['AR', 'AU', 'BO', 'BR', 'CA', 'CL', 'CO', 'DO', 'EC', 'ES', 'FK', 'FR', 'GB', 'IT', 'MX', 'NZ', 'PA', 'PE', 'PY', 'US', 'UY']
 
 def get_labels_as_dict(to_use,key,val):
     aux=to_use[[key,val]].drop_duplicates()
@@ -135,7 +148,7 @@ def procesar_dataframe(df):
 
     # cambiar el tipo de vuelo a I o N a 0
     dict_tipo = {'N': 0, "I": 1}
-    df['TIPOVUELO'] = df['TIPOVUELO'].map({'N': 0, "I": 1})
+    df['TIPOVUELO'] = df['TIPOVUELO'].map(dict_tipo)
 
     # obtener siglas y luego borrar de dataframe
     key, val = 'Ori-I', 'SIGLAORI'
@@ -160,6 +173,10 @@ def procesar_dataframe(df):
     df['Vlo-I'] = [str(int(float(x))) if x.replace('.', '').isdecimal() else x for x in
                    df['Vlo-I'].astype(str).values.tolist()]
 
+    # cambiar el dia de la semana a numero
+
+    df['DIANOM'] = df['DIANOM'].map(dict_dia_semana)
+
 
     # para efectos de cross validation necesito ordenarlos por fecha
     df=df.sort_values('Fecha-O')
@@ -168,46 +185,66 @@ def procesar_dataframe(df):
 
 
 def calc_features(df):
-    # TODO vars
-    df['cambio_destino'] = (df['Des-I'] != df['Des-O']).astype(int)
     df['cambio_empresa'] = (df['Emp-I'] != df['Emp-O']).astype(int)
-    df['cambio_avion'] = (df['Vlo-I'] != df['Vlo-O']).astype(int)
 
     # TODO agregar temperatura
-    # TODo agregar dia semana percentil
     # todo agregar semana del ano percentil ???? (estare sobre ajustando?)
+
     # TODO codificar aeropuerto destino
     # TODO codificar empresa operando
-    # TODO codificar pais
 
-    """
-    idea modelo:
+    # TODO codificar demanda ultimos 10 dias ?
+    # TODO crear variables que midan saturacion de red. Ejmplo vuelos interacionales X dias atras
 
-    dado la cantidad de gente usando el servicio este baja calidad y mas prob de retraso
-        dia semana carga
-        semana del anno carga
-        alta demanda ??
-        
-        Colocarles notas a cada aerolinea
-        Colocarles notas a cada dia de la semana
-        Colocarles notas a cada semana del anno
+    # ONE HOT de paises destino
+    enc = OneHotEncoder()
+    res=enc.fit_transform(df['dest_country'].values.reshape(-1, 1)).todense()
+    df_encoded_countries=pd.DataFrame(res,columns=enc.categories_[0])
+    df_encoded_countries['id']=df['id'].values.tolist()
+    df=df.merge(df_encoded_countries, on='id', how='left')
 
-        cambia_destino
-        cambia_empresa
-        cambia_avion 
+    # por cada empresa colocar cantidad vuelos ultimos X dias
+    df=df.set_index('Fecha-I').sort_index().reset_index()
+    days=30
+    agg='count'
+
+    # rolling carpa por empresa
+    aux=df.groupby('Emp-I').rolling(window='{0}D'.format(days),
+                                    on='Fecha-I').aggregate({'atraso_15': agg, 'id': lambda x: x[-1]}).rename(columns={'atraso_15':'rolling_emp_carga'})
+    aux['rolling_emp_carga']=np.clip(aux['rolling_emp_carga']/days,0,1)
+    df=df.merge(aux,on='id',how='left')
+
+    # rolling carga del destino
+    aux=df.groupby('Des-I').rolling(window='{0}D'.format(days),
+                                    on='Fecha-I').aggregate({'atraso_15': agg, 'id': lambda x: x[-1]}).rename(columns={'atraso_15':'rolling_dest_carga'})
+    aux['rolling_dest_carga']=np.clip(aux['rolling_dest_carga']/days,0,1)
+    df=df.merge(aux,on='id',how='left')
 
 
-
-    """
+    # dias rankeados segun demanda
     dict_calidad={
-        'Domingo':0,
-        'Lunes':1,
-        'Martes':3,
-        'Miercoles':4,
-        'Jueves':6,
-        'Viernes':4,
-       'Sabado':7} # TODO como aprender este parametro ? (one hot encoding)
-    df['calidad_dia']=[dict_calidad[x] for x in df['DIANOM'].values.tolist()]
+        'Viernes': 6,
+        'Jueves': 5,
+        'Lunes': 4,
+        'Domingo': 3,
+        'Miercoles': 2,
+        'Martes': 1,
+        'Sabado':0
+    }
+    inv_code_to_day={v:k for k,v in dict_dia_semana.items()}
+    df['calidad_dia']=np.array([dict_calidad[inv_code_to_day[x]] for x in df['DIANOM'].values.tolist()]) / 6
+
+    df['calidad_year_dia']=[x for x in df['Fecha-I'].dt.dayofyear.values.tolist()]
+
+    # one hot encoding de los dias
+    for i in range(7):
+        df['dia_{0}'.format(i)]=[x==i for x in df['DIANOM'].values.tolist()]
+
+
+    df['x0'] = np.array([x%7 for x in df['Fecha-I'].dt.dayofyear.values.tolist()])#/7
+    df['x1'] = np.array([x%30 for x in df['Fecha-I'].dt.dayofyear.values.tolist()])#/30
+    df['x2'] = np.array([x%(30*4) for x in df['Fecha-I'].dt.dayofyear.values.tolist()])#/(30*4)
+
 
     return df
 
@@ -231,4 +268,33 @@ def a_few_plots(df):
         ax = (df_key['Vlo-I'] / fact).clip(-3, 3).plot(x='Fecha-I', y='Vlo-I', ax=ax, label=key)
     plt.show()
 
-    pass
+    # efecto del destino en atraso TODO algo interesante?
+    rr = df.groupby('Des-I').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    rr['enought']=rr['n'] > 100
+    print(rr[rr.enought]['m'].quantile([0.1 * i for i in range(10)]))
+
+    # efecto de empresa en atraso efecto igual importante. del percentil 0.7 es bastante alto
+    rr = df.groupby('Emp-I').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    rr['enought']=rr['n'] > 100
+    print(rr[rr.enought]['m'].quantile([0.1 * i for i in range(10)]))
+
+
+    # efecto de tiempo del dia en atraso
+    # no mucho, pero en la manana tiene de ser menor atraso
+    df[['periodo_dia', 'atraso_15']].groupby('periodo_dia').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+
+    # efecto del tipo de viaje en atraso. Efectoi mportante
+    rr = df.groupby('TIPOVUELO').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    print(rr)
+
+    # efecto del mes en atraso. HAy importancia a periodos de alta actividad veer como sube atraso
+    rr = df.groupby(pd.Grouper(freq='M', key='Fecha-I')).agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    print(rr)
+
+    # efecto del dia de la semana. a mayor cantidad de gente sube algo el % de atraso.
+    rr = df.groupby(pd.Grouper(freq='M', key='Fecha-I')).agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    print(rr)
+
+    # efecto de temporada. Ligereamente mas alta segun temporada alta o no
+    rr = df.groupby('temporada_alta').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    print(rr)

@@ -9,10 +9,10 @@ periodo_dia: mañana(entre 5:00 y 11:59) ,tarde( entre 12:00 y 18:59)  y noche( 
 3. ¿Cómo se compone la tasa de atraso por:
     destino,
     aerolínea,
-    mes del año,
-    día de la semana,
-    temporada,
-    tipo de vuelo?
+    mes del año, X
+    día de la semana, X
+    temporada, X
+    tipo de vuelo? X
     ¿Qué variables esperarías que más influyeran en predecir atrasos?
 
 
