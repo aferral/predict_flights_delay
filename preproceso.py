@@ -15,6 +15,8 @@ dict_dia_semana = {
     'Domingo': 6,
 }
 
+periodo_dict = {0: 'mañana', 1: 'tarde', 2: 'noche'}  # [5:00 - 12:00(  [12:00 a 19:00( [19:00 a 05:00(
+
 RELEVANT_COUNTRIES=['AR', 'AU', 'BO', 'BR', 'CA', 'CL', 'CO', 'DO', 'EC', 'ES', 'FK', 'FR', 'GB', 'IT', 'MX', 'NZ', 'PA', 'PE', 'PY', 'US', 'UY']
 
 def get_labels_as_dict(to_use,key,val):
@@ -51,55 +53,7 @@ def get_periodo(time_obj): # [5:00 - 12:00(  [12:00 a 19:00( [19:00 a 05:00(
         return 2
 
 
-def a_few_plots(df):
-    key_to_use = 'Emp-I'
-    norm = False
-    res = df.groupby([pd.Grouper(key='Fecha-I', freq='SM'), key_to_use])['Vlo-I'].count().reset_index()
-    ax = None
-    for key, df_key in res.groupby(key_to_use):
-        fact = df_key['Vlo-I'].iloc[0] if norm else 1
-        ax = (df_key['Vlo-I'] / fact).plot(x='Fecha-I', y='Vlo-I', ax=ax, label=key)
-    plt.show()
 
-    key_to_use = 'Des-I'
-    norm = True
-    res = df.groupby([pd.Grouper(key='Fecha-I', freq='SM'), key_to_use])['Vlo-I'].count().reset_index()
-    ax = None
-    for key, df_key in res.groupby(key_to_use):
-        fact = df_key['Vlo-I'].iloc[0] if norm else 1
-        ax = (df_key['Vlo-I'] / fact).clip(-3, 3).plot(x='Fecha-I', y='Vlo-I', ax=ax, label=key)
-    plt.show()
-
-    # efecto del destino en atraso TODO algo interesante?
-    rr = df.groupby('Des-I').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    rr['enought']=rr['n'] > 100
-    print(rr[rr.enought]['m'].quantile([0.1 * i for i in range(10)]))
-
-    # efecto de empresa en atraso efecto igual importante. del percentil 0.7 es bastante alto
-    rr = df.groupby('Emp-I').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    rr['enought']=rr['n'] > 100
-    print(rr[rr.enought]['m'].quantile([0.1 * i for i in range(10)]))
-
-
-    # efecto de tiempo del dia en atraso
-    # no mucho, pero en la manana tiene de ser menor atraso
-    df[['periodo_dia', 'atraso_15']].groupby('periodo_dia').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-
-    # efecto del tipo de viaje en atraso. Efectoi mportante
-    rr = df.groupby('TIPOVUELO').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    print(rr)
-
-    # efecto del mes en atraso. HAy importancia a periodos de alta actividad veer como sube atraso
-    rr = df.groupby(pd.Grouper(freq='M', key='Fecha-I')).agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    print(rr)
-
-    # efecto del dia de la semana. a mayor cantidad de gente sube algo el % de atraso.
-    rr = df.groupby(pd.Grouper(freq='M', key='Fecha-I')).agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    print(rr)
-
-    # efecto de temporada. Ligereamente mas alta segun temporada alta o no
-    rr = df.groupby('temporada_alta').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    print(rr)
 
 
 def get_processed_data():
@@ -123,12 +77,10 @@ def get_processed_data():
     df['Fecha-I'] = pd.to_datetime(df['Fecha-I'])
     df['Fecha-O'] = pd.to_datetime(df['Fecha-O'])
 
+
     df['temporada_alta'] = ([int(is_high_season(x)) for x in df['Fecha-I'].dt.to_pydatetime()])
     df['dif_min'] = (df['Fecha-O'] - df['Fecha-I']).dt.total_seconds() / 60
     df['atraso_15'] = (df['dif_min'] > 15).astype(int)
-
-    periodo_dict = {0: 'mañana', 1: 'tarde', 2: 'noche'}  # [5:00 - 12:00(  [12:00 a 19:00( [19:00 a 05:00(
-
     df['periodo_dia'] = [get_periodo(x) for x in df['Fecha-I'].dt.time.values.tolist()]
 
     # como el origen es siempre el mismo aeropuerto podemos quitar
@@ -164,15 +116,15 @@ def get_processed_data():
     df = df.drop('Ori-I', axis=1)
 
     # para comparar esta variable hay que tener cuidado con el parse
+    #CUIDADO CON df['Vlo-O'] y df['Vlo-I'] al inferir los tipos hay que tener cuidado. no se puede llegar y pasar a int
+    #Tampoco sirve float ya que hay strings. Para que los valores coincidan (400.0 vs 400) hay que intentar parse como int y si no es numero a string
     df['Vlo-O'] = [str(int(float(x))) if x.replace('.', '').isdecimal() else x for x in
                    df['Vlo-O'].astype(str).values.tolist()]
     df['Vlo-I'] = [str(int(float(x))) if x.replace('.', '').isdecimal() else x for x in
                    df['Vlo-I'].astype(str).values.tolist()]
 
     # cambiar el dia de la semana a numero
-
     df['DIANOM'] = df['DIANOM'].map(dict_dia_semana)
-
 
     # para efectos de cross validation necesito ordenarlos por fecha
     df=df.sort_values('Fecha-O')
@@ -205,13 +157,13 @@ def get_processed_data():
 
     # rolling carpa por empresa
     aux=df.groupby('Emp-I').rolling(window='{0}D'.format(days),
-                                    on='Fecha-I').aggregate({'atraso_15': agg, 'id': lambda x: x[-1]}).rename(columns={'atraso_15':'rolling_emp_carga'})
+                                    on='Fecha-I').aggregate({'id': agg, 'id': lambda x: x[-1]}).rename(columns={'id':'rolling_emp_carga'})
     aux['rolling_emp_carga']=np.clip(aux['rolling_emp_carga']/days,0,1)
     df=df.merge(aux,on='id',how='left')
 
     # rolling carga del destino
     aux=df.groupby('Des-I').rolling(window='{0}D'.format(days),
-                                    on='Fecha-I').aggregate({'atraso_15': agg, 'id': lambda x: x[-1]}).rename(columns={'atraso_15':'rolling_dest_carga'})
+                                    on='Fecha-I').aggregate({'id': agg, 'id': lambda x: x[-1]}).rename(columns={'id':'rolling_dest_carga'})
     aux['rolling_dest_carga']=np.clip(aux['rolling_dest_carga']/days,0,1)
     df=df.merge(aux,on='id',how='left')
 
