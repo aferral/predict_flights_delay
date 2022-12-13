@@ -1,31 +1,14 @@
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import TimeSeriesSplit,KFold
 import numpy as np
 import random
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
-import haversine as hs
-from preproceso import procesar_dataframe, calc_features, a_few_plots, RELEVANT_COUNTRIES
-from utils_data import get_airport_data
+from preproceso import a_few_plots, RELEVANT_COUNTRIES, get_processed_data
 from utils_eval import evaluate_predicted_df, plot_roc, get_metric_and_best_threshold_from_roc_curve
 
-rt = 'dataset_SCL.csv'
-
-df = pd.read_csv(rt)
-
-# agrega 'dest_country','dest_dist'
-df_airports=get_airport_data()
-x0,y0=df_airports[df_airports['icao']=='SCEL'][['lat','lon']].iloc[0].values.tolist()
-distancias_a_arturo_benites=[hs.haversine((lat,lon),(x0,y0))for lat,lon in df_airports[['lat','lon']].values.tolist()]
-df_airports['dist']=distancias_a_arturo_benites
-df_airports=df_airports[['icao','country','dist']].rename(columns={'country':'dest_country','dist':'dest_dist'})
-df=df.merge(df_airports,left_on='Des-I',right_on='icao',how='left').drop('icao',axis=1)
-
-df,dict_tipo,periodo_dict,company_dict,airports_dict=procesar_dataframe(df)
-
-df=calc_features(df)
-
-# a_few_plots(df) # TODO plot in jupyer
+df,company_dict=get_processed_data()
 
 # Train test split
 # TODO split by fecha
@@ -54,8 +37,6 @@ for i, (train_index, test_index) in enumerate(tscv.split(indexs_to_use)):
     df_train=df.iloc[train_index]
     df_test=df.iloc[test_index]
 
-    # TODO test de sanidad esto es practicamente pasar el target en entrenamiento
-    # FEATURES=['dif_min']
     FEATURES=[
         'TIPOVUELO',
               'periodo_dia',
@@ -79,14 +60,12 @@ for i, (train_index, test_index) in enumerate(tscv.split(indexs_to_use)):
 
 
     TARGET_COL='atraso_15'
-    # TODO quitar               'temporada_alta',
 
     x_train,y_train=df_train[FEATURES].values,df_train[TARGET_COL].astype(int).values
     x_val,y_val=df_test[FEATURES].values,df_test[TARGET_COL].astype(int).values
 
 
     # modelo simple
-    from sklearn.linear_model import LogisticRegression
 
     # Create an instance of Logistic Regression Classifier and fit the data.
     clf = LogisticRegression()

@@ -1,3 +1,5 @@
+import haversine as hs
+from utils_data import get_airport_data
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -49,79 +51,73 @@ def get_periodo(time_obj): # [5:00 - 12:00(  [12:00 a 19:00( [19:00 a 05:00(
         return 2
 
 
-"""
-Cosas interesantes
+def a_few_plots(df):
+    key_to_use = 'Emp-I'
+    norm = False
+    res = df.groupby([pd.Grouper(key='Fecha-I', freq='SM'), key_to_use])['Vlo-I'].count().reset_index()
+    ax = None
+    for key, df_key in res.groupby(key_to_use):
+        fact = df_key['Vlo-I'].iloc[0] if norm else 1
+        ax = (df_key['Vlo-I'] / fact).plot(x='Fecha-I', y='Vlo-I', ax=ax, label=key)
+    plt.show()
 
-* Esta mal definida el label de OPERA. Opera es realmente el label de la empresa del vuelo programado
-Emp-I							OPERA
-ejemplo:
-df[df['Emp-O'] == 'AUT'][['Emp-I','Emp-O','OPERA']].drop_duplicates()
+    key_to_use = 'Des-I'
+    norm = True
+    res = df.groupby([pd.Grouper(key='Fecha-I', freq='SM'), key_to_use])['Vlo-I'].count().reset_index()
+    ax = None
+    for key, df_key in res.groupby(key_to_use):
+        fact = df_key['Vlo-I'].iloc[0] if norm else 1
+        ax = (df_key['Vlo-I'] / fact).clip(-3, 3).plot(x='Fecha-I', y='Vlo-I', ax=ax, label=key)
+    plt.show()
 
-* CUIDADO CON df['Vlo-O'] y df['Vlo-I'] al inferir los tipos hay que tener cuidado. no se puede llegar y pasar a int
-ya que faltan valores. Tampoco sirve float ya que hay strings. Para que los valores coincidan (400.0 vs 400) hay que intentar parse como int y si no es numero a strin
+    # efecto del destino en atraso TODO algo interesante?
+    rr = df.groupby('Des-I').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    rr['enought']=rr['n'] > 100
+    print(rr[rr.enought]['m'].quantile([0.1 * i for i in range(10)]))
 
-* pocas veces cambian de vuelo el numero
-(df['Vlo-O'] != df['Vlo-I']).sum()
-
-* Es bastante comun cambiar de empresa (notar que no cambia numeros de vuelo)
-(df['Vlo-O'] != df['Vlo-I']).sum()
-
-* MUy poco comun cambiar destino
-(df['Des-I'] != df['Des-O']).sum()
-
-* Los dias de vuelo mas comunes son viernes y jueves el menos comun sabado
-df['DIANOM'].value_counts()
-
-* fechas de un anno de 2017 a 2018.
-    si se grafica por quincenas 
-
-        Si bien el peek de dic-marzo , julio es claro. El otro peek parece ser octubre y no septiembre como sale en temporada alta
-        df['temporada_alta']*3000
-        ax = df.groupby(pd.Grouper(freq='SM', key='Fecha-I'))['Fecha-I'].count().plot(style='*--')
-        (df.set_index('Fecha-I')['temporada_alta']*3000).plot(ax=ax, x='Fecha-I', y='temporada_alta')
-        plt.show()
-        print('f')
-
-* Algo importante. Dado que estoy trabajando con un anno es bastante posible que sobre ajuste los datos. Se requiere mayores datos para validar
-estacionalidad.
-
-* La temporada alta concentra el 66% de los viajes
-df['temporada_alta'].value_counts(normalize=True)
-
-* el rate de atraso tambien crece en temporada alta
-    es entonces importante la demanda del aeropuerto
-    df.groupby(pd.Grouper(freq='SM',key='Fecha-I'))['atraso_15'].mean().plot(style='*--')
-
-* todos del mismo origen
-    Cuidado con buscar generalizar fuera de este aeropuerto
-
-* vuelos internacionales y nacionales siguen mismo patron de demanda
-key_to_use='TIPOVUELO'
-res=df.groupby([pd.Grouper(key='Fecha-I',freq='SM'),key_to_use])['Vlo-I'].count().reset_index()
-ax=None
-for key,df_key in res.groupby(key_to_use):
-    ax=df_key.plot(x='Fecha-I',y='Vlo-I',ax=ax,label=key)
-plt.show()
+    # efecto de empresa en atraso efecto igual importante. del percentil 0.7 es bastante alto
+    rr = df.groupby('Emp-I').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    rr['enought']=rr['n'] > 100
+    print(rr[rr.enought]['m'].quantile([0.1 * i for i in range(10)]))
 
 
-* Vuelos muy concentrados entre GRUPO lata y sky (80 % de los vuelos)
-df['Emp-O'].value_counts(normalize=True)
-df['emp']=[company_dict[x] for x in df['Emp-O'].values.tolist()]
-df['emp'].value_counts(normalize=True)
+    # efecto de tiempo del dia en atraso
+    # no mucho, pero en la manana tiene de ser menor atraso
+    df[['periodo_dia', 'atraso_15']].groupby('periodo_dia').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
 
-* Ligeramente ams vuelos nacionales 54% vs 45%
-df['TIPOVUELO'].value_counts(normalize=True)
+    # efecto del tipo de viaje en atraso. Efectoi mportante
+    rr = df.groupby('TIPOVUELO').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    print(rr)
 
-* El atraso en minutos es generalmente de 4 minutos. Hay que llegar al percentil 90 para tener un atraso de 15 minutos (eventos raros)
-df['dif_min'].quantile([0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9])
-df['atraso_15'].value_counts(normalize=True)
+    # efecto del mes en atraso. HAy importancia a periodos de alta actividad veer como sube atraso
+    rr = df.groupby(pd.Grouper(freq='M', key='Fecha-I')).agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    print(rr)
 
-* Los vuelos estan mas o menos equitativos en manana y dia. La noche tiene un poco menos
-df['periodo_dia'].value_counts(normalize=True)
+    # efecto del dia de la semana. a mayor cantidad de gente sube algo el % de atraso.
+    rr = df.groupby(pd.Grouper(freq='M', key='Fecha-I')).agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    print(rr)
 
-"""
+    # efecto de temporada. Ligereamente mas alta segun temporada alta o no
+    rr = df.groupby('temporada_alta').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
+    print(rr)
 
-def procesar_dataframe(df):
+
+def get_processed_data():
+    """
+    Obtiene el dataframe con los datos a usar en el modelo
+    """
+    rt = 'dataset_SCL.csv'
+    df = pd.read_csv(rt)
+
+    # agrega 'dest_country','dest_dist'
+    df_airports = get_airport_data()
+    x0, y0 = df_airports[df_airports['icao'] == 'SCEL'][['lat', 'lon']].iloc[0].values.tolist()
+    distancias_a_arturo_benites = [hs.haversine((lat, lon), (x0, y0)) for lat, lon in
+                                   df_airports[['lat', 'lon']].values.tolist()]
+    df_airports['dist'] = distancias_a_arturo_benites
+    df_airports = df_airports[['icao', 'country', 'dist']].rename(
+        columns={'country': 'dest_country', 'dist': 'dest_dist'})
+    df = df.merge(df_airports, left_on='Des-I', right_on='icao', how='left').drop('icao', axis=1)
 
 
     df['Fecha-I'] = pd.to_datetime(df['Fecha-I'])
@@ -181,12 +177,11 @@ def procesar_dataframe(df):
     # para efectos de cross validation necesito ordenarlos por fecha
     df=df.sort_values('Fecha-O')
     df['id'] = np.arange(df.shape[0])
-    return df,dict_tipo,periodo_dict,company_dict,airports_dict
 
 
-def calc_features(df):
     df['cambio_empresa'] = (df['Emp-I'] != df['Emp-O']).astype(int)
 
+    # TODO definir temporada alta v2 ?
     # TODO agregar temperatura
     # todo agregar semana del ano percentil ???? (estare sobre ajustando?)
 
@@ -238,63 +233,13 @@ def calc_features(df):
 
     # one hot encoding de los dias
     for i in range(7):
-        df['dia_{0}'.format(i)]=[x==i for x in df['DIANOM'].values.tolist()]
+        df['dia_{0}'.format(i)]=[int(x==i) for x in df['DIANOM'].values.tolist()]
 
 
+    # variables de dias dada distinta frecuencia.
     df['x0'] = np.array([x%7 for x in df['Fecha-I'].dt.dayofyear.values.tolist()])#/7
     df['x1'] = np.array([x%30 for x in df['Fecha-I'].dt.dayofyear.values.tolist()])#/30
     df['x2'] = np.array([x%(30*4) for x in df['Fecha-I'].dt.dayofyear.values.tolist()])#/(30*4)
 
 
-    return df
-
-
-def a_few_plots(df):
-    key_to_use = 'Emp-I'
-    norm = False
-    res = df.groupby([pd.Grouper(key='Fecha-I', freq='SM'), key_to_use])['Vlo-I'].count().reset_index()
-    ax = None
-    for key, df_key in res.groupby(key_to_use):
-        fact = df_key['Vlo-I'].iloc[0] if norm else 1
-        ax = (df_key['Vlo-I'] / fact).plot(x='Fecha-I', y='Vlo-I', ax=ax, label=key)
-    plt.show()
-
-    key_to_use = 'Des-I'
-    norm = True
-    res = df.groupby([pd.Grouper(key='Fecha-I', freq='SM'), key_to_use])['Vlo-I'].count().reset_index()
-    ax = None
-    for key, df_key in res.groupby(key_to_use):
-        fact = df_key['Vlo-I'].iloc[0] if norm else 1
-        ax = (df_key['Vlo-I'] / fact).clip(-3, 3).plot(x='Fecha-I', y='Vlo-I', ax=ax, label=key)
-    plt.show()
-
-    # efecto del destino en atraso TODO algo interesante?
-    rr = df.groupby('Des-I').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    rr['enought']=rr['n'] > 100
-    print(rr[rr.enought]['m'].quantile([0.1 * i for i in range(10)]))
-
-    # efecto de empresa en atraso efecto igual importante. del percentil 0.7 es bastante alto
-    rr = df.groupby('Emp-I').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    rr['enought']=rr['n'] > 100
-    print(rr[rr.enought]['m'].quantile([0.1 * i for i in range(10)]))
-
-
-    # efecto de tiempo del dia en atraso
-    # no mucho, pero en la manana tiene de ser menor atraso
-    df[['periodo_dia', 'atraso_15']].groupby('periodo_dia').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-
-    # efecto del tipo de viaje en atraso. Efectoi mportante
-    rr = df.groupby('TIPOVUELO').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    print(rr)
-
-    # efecto del mes en atraso. HAy importancia a periodos de alta actividad veer como sube atraso
-    rr = df.groupby(pd.Grouper(freq='M', key='Fecha-I')).agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    print(rr)
-
-    # efecto del dia de la semana. a mayor cantidad de gente sube algo el % de atraso.
-    rr = df.groupby(pd.Grouper(freq='M', key='Fecha-I')).agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    print(rr)
-
-    # efecto de temporada. Ligereamente mas alta segun temporada alta o no
-    rr = df.groupby('temporada_alta').agg(n=('atraso_15', 'count'), m=('atraso_15', 'mean'))
-    print(rr)
+    return df,company_dict

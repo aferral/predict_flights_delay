@@ -41,3 +41,11 @@ df = df.merge(aux, on='id', how='left').fillna(0.16)
 # cambios de avion y destino muy raros
 df['cambio_destino'] = (df['Des-I'] != df['Des-O']).astype(int)
 df['cambio_avion'] = (df['Vlo-I'] != df['Vlo-O']).astype(int)
+
+# cantidad de vuelos pro dia
+df['vuelos_ese_dia'] = df.groupby(pd.Grouper(freq='D', key='Fecha-I'))['dest_country'].transform('count')
+df['vuelos_4_dia'] = df.groupby(pd.Grouper(freq='4D', key='Fecha-I'))['dest_country'].transform('count')
+
+# atrasos en los ultimos 20 vuelos
+df['rolling_atraso'] = df.groupby('Des-I').rolling(20).aggregate({'atraso_15': 'sum'})['atraso_15'].fillna(
+    0).values.tolist()

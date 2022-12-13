@@ -1,4 +1,9 @@
 
+# baseline :
+0.5399005001763061
+0.537601989584683
+0.540094193402573
+
 # TODO me parece que un predictor muy importante:
     que ha pasado con los ultimos 10 vuelos ?
 
@@ -7,9 +12,9 @@
     Me parece que x0,x1,x2 esta haciendo corto circuito
         efectos de la normalizacion de x0,x1,x2
 
+# TODO variable carga del aeropuerto en las ultiams 48,72,24 horas
 
-
-- subir a repo publico
+rev k
 
 - usar ramas main, dev, practicas gitflow
 https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow#:~:text=Gitflow%20is%20a%20legacy%20Git,software%20development%20and%20DevOps%20practices
@@ -19,9 +24,6 @@ día viernes 16 de diciembre a las 23:59
 
 
 - colocar en solution.ipynb respuestas del codigo
-- agregar curriculum en repo
 
-
-- crearle un makefile
 
 - enviar link al repo ChallengeDataScientist-[Nombre][Apellido],ejemploChallenge Data Scientist - Pedro Pica Piedra

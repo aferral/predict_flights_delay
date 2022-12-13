@@ -2,3 +2,4 @@ pandas==1.5.2
 matplotlib==3.6.2
 scikit-learn==1.2.0
 haversine==2.7.0
+jupyter==1.0.0
