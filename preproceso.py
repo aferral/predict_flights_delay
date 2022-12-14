@@ -157,13 +157,13 @@ def get_processed_data():
 
     # rolling carpa por empresa
     aux=df.groupby('Emp-I').rolling(window='{0}D'.format(days),
-                                    on='Fecha-I').aggregate({'id': agg, 'id': lambda x: x[-1]}).rename(columns={'id':'rolling_emp_carga'})
+                                    on='Fecha-I').aggregate({'Vlo-I': agg, 'id': lambda x: x[-1]}).rename(columns={'Vlo-I':'rolling_emp_carga'})
     aux['rolling_emp_carga']=np.clip(aux['rolling_emp_carga']/days,0,1)
     df=df.merge(aux,on='id',how='left')
 
     # rolling carga del destino
     aux=df.groupby('Des-I').rolling(window='{0}D'.format(days),
-                                    on='Fecha-I').aggregate({'id': agg, 'id': lambda x: x[-1]}).rename(columns={'id':'rolling_dest_carga'})
+                                    on='Fecha-I').aggregate({'Vlo-I': agg, 'id': lambda x: x[-1]}).rename(columns={'Vlo-I':'rolling_dest_carga'})
     aux['rolling_dest_carga']=np.clip(aux['rolling_dest_carga']/days,0,1)
     df=df.merge(aux,on='id',how='left')
 
@@ -189,9 +189,12 @@ def get_processed_data():
 
 
     # variables de dias dada distinta frecuencia.
-    df['x0'] = np.array([x%7 for x in df['Fecha-I'].dt.dayofyear.values.tolist()])#/7
-    df['x1'] = np.array([x%30 for x in df['Fecha-I'].dt.dayofyear.values.tolist()])#/30
-    df['x2'] = np.array([x%(30*4) for x in df['Fecha-I'].dt.dayofyear.values.tolist()])#/(30*4)
+    df['x0'] = np.array([x%7 for x in df['Fecha-I'].dt.dayofyear.values.tolist()])/7
+    df['x1'] = np.array([x%30 for x in df['Fecha-I'].dt.dayofyear.values.tolist()])/30
+    df['x2'] = np.array([x%(30*4) for x in df['Fecha-I'].dt.dayofyear.values.tolist()])/(30*4)
 
 
     return df,company_dict
+
+if __name__ == '__main__':
+    get_processed_data()

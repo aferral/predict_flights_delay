@@ -49,3 +49,11 @@ df['vuelos_4_dia'] = df.groupby(pd.Grouper(freq='4D', key='Fecha-I'))['dest_coun
 # atrasos en los ultimos 20 vuelos
 df['rolling_atraso'] = df.groupby('Des-I').rolling(20).aggregate({'atraso_15': 'sum'})['atraso_15'].fillna(
     0).values.tolist()
+
+
+# normalizar la carga por empresa
+map_daily_load_company = df.groupby(['Emp-I', pd.Grouper(key='Fecha-I', freq='D')])['Vlo-I'].count().groupby(
+    'Emp-I').median().to_dict()
+aux['rolling_emp_norm'] = [(x / map_daily_load_company[emp]) / 50 for emp, x in
+                           aux.reset_index()[['Emp-I', 'rolling_emp_carga']].values.tolist()]
+aux['rolling_emp_norm'] = aux['rolling_emp_norm'].clip(0, 1)

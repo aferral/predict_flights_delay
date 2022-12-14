@@ -65,6 +65,13 @@ def get_metric_and_best_threshold_from_roc_curve(y_train, y_score, calc='f1'):
         best_threshold = thresholds[np.argmax(score)]
         best_score = np.amax(score)
 
+    elif calc == 'prec_pos':
+        precision_pos = (tp) * 1.0 / (tp + fp)
+        precision_pos = np.nan_to_num(precision_pos, 0)
+        score = precision_pos
+        best_threshold = thresholds[np.argmax(score)]
+        best_score = np.amax(score)
+
     elif calc == 'acc':
         score = (tp + tn) * 1.0 / (tp + tn + fp + fn)
         best_threshold = thresholds[np.argmax(score)]
