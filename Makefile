@@ -1,7 +1,7 @@
 
 
 install:
-    pip install -r requirements.txt
+	pip install -r requirements.txt
 
 run:
-    python main.py
+	jupyter notebook solution.ipynb
