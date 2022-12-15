@@ -1,3 +1,8 @@
+"""
+Ideas descartadas. Quizas pueden ser utiles al futuro
+
+"""
+
 
 #======== rolling carga del aeropuerto
 aux = df.rolling(window='{0}D'.format(days),

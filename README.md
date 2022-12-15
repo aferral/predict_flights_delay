@@ -14,6 +14,13 @@ Nota: Se uso python3.8
 make install
 ```
 
+# (opcional) Instalar kernel con virtualenv para jupyter
+
+Si se usa virtualenv hay que habilitarlo en jupyter. 
+```
+make jupyter-kernel
+```
+
 
 # Como ejecutar (levanta jupyter notebook con codigo)
 ```

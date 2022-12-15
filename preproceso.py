@@ -2,7 +2,6 @@ import haversine as hs
 from utils_data import get_airport_data
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.preprocessing import OneHotEncoder
 
 dict_dia_semana = {
@@ -54,8 +53,6 @@ def get_periodo(time_obj): # [5:00 - 12:00(  [12:00 a 19:00( [19:00 a 05:00(
 
 
 
-
-
 def get_processed_data():
     """
     Obtiene el dataframe con los datos a usar en el modelo
@@ -78,6 +75,7 @@ def get_processed_data():
     df['Fecha-O'] = pd.to_datetime(df['Fecha-O'])
 
 
+    # features solicitadas en pregunta 2
     df['temporada_alta'] = ([int(is_high_season(x)) for x in df['Fecha-I'].dt.to_pydatetime()])
     df['dif_min'] = (df['Fecha-O'] - df['Fecha-I']).dt.total_seconds() / 60
     df['atraso_15'] = (df['dif_min'] > 15).astype(int)
@@ -131,17 +129,17 @@ def get_processed_data():
     df['id'] = np.arange(df.shape[0])
 
 
+    # solo calculamos cambio de empresa los otros cambios son muy poco comunes para ser importantes
     df['cambio_empresa'] = (df['Emp-I'] != df['Emp-O']).astype(int)
 
-    # TODO definir temporada alta v2 ?
-    # TODO agregar temperatura
-    # todo agregar semana del ano percentil ???? (estare sobre ajustando?)
 
-    # TODO codificar aeropuerto destino
-    # TODO codificar empresa operando
+    # empresa confiabilidad v3 (cuidado usa historia full)
+    aux = df.groupby('Emp-I').agg(emp_confianza=('atraso_15', 'mean'), id=('id', 'first'))
+    df = df.merge(aux, on='id', how='left').fillna(0.2)
 
-    # TODO codificar demanda ultimos 10 dias ?
-    # TODO crear variables que midan saturacion de red. Ejmplo vuelos interacionales X dias atras
+    # lo mismo pero con aeropuerto
+    aux = df.groupby('Des-I').agg(aeropuerto_confianza=('atraso_15', 'mean'), id=('id', 'first'))
+    df = df.merge(aux, on='id', how='left').fillna(0.2)
 
     # ONE HOT de paises destino
     enc = OneHotEncoder()
@@ -149,6 +147,11 @@ def get_processed_data():
     df_encoded_countries=pd.DataFrame(res,columns=enc.categories_[0])
     df_encoded_countries['id']=df['id'].values.tolist()
     df=df.merge(df_encoded_countries, on='id', how='left')
+
+    # one hot encoding de los dias
+    for i in range(7):
+        df['dia_{0}'.format(i)]=[int(x==i) for x in df['DIANOM'].values.tolist()]
+
 
     # por cada empresa colocar cantidad vuelos ultimos X dias
     df=df.set_index('Fecha-I').sort_index().reset_index()
@@ -182,11 +185,6 @@ def get_processed_data():
     df['calidad_dia']=np.array([dict_calidad[inv_code_to_day[x]] for x in df['DIANOM'].values.tolist()]) / 6
 
     df['calidad_year_dia']=[x for x in df['Fecha-I'].dt.dayofyear.values.tolist()]
-
-    # one hot encoding de los dias
-    for i in range(7):
-        df['dia_{0}'.format(i)]=[int(x==i) for x in df['DIANOM'].values.tolist()]
-
 
     # variables de dias dada distinta frecuencia.
     df['x0'] = np.array([x%7 for x in df['Fecha-I'].dt.dayofyear.values.tolist()])/7
