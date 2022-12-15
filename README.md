@@ -18,7 +18,7 @@ make install
 
 Si se usa virtualenv hay que habilitarlo en jupyter. 
 ```
-make jupyter-kernel
+make install_jupyter_kernel
 ```
 
 
